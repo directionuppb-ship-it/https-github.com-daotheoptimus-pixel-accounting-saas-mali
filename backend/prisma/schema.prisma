@@ -1,0 +1,163 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== USER & AUTH =====
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String
+  role      UserRole   @default(USER)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  invoices  Invoice[]
+  expenses  Expense[]
+  clients   Client[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+  VIEWER
+}
+
+// ===== CLIENTS =====
+model Client {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  country   String?
+  taxId     String?     @unique
+  status    ClientStatus @default(ACTIVE)
+  
+  invoices  Invoice[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([userId, taxId])
+  @@map("clients")
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// ===== INVOICES =====
+model Invoice {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  invoiceNumber   String     @unique
+  clientId        String
+  client          Client     @relation(fields: [clientId], references: [id])
+  
+  amount          Float
+  currency        String     @default("XOF")
+  status          InvoiceStatus @default(DRAFT)
+  
+  issueDate       DateTime
+  dueDate         DateTime
+  paidDate        DateTime?
+  
+  items           InvoiceItem[]
+  notes           String?
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceItem {
+  id              String     @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  description     String
+  quantity        Float
+  unitPrice       Float
+  total           Float
+  
+  @@map("invoice_items")
+}
+
+// ===== EXPENSES =====
+model Expense {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  description     String
+  amount          Float
+  currency        String     @default("XOF")
+  category        ExpenseCategory
+  date            DateTime
+  
+  vendor          String?
+  receipt         String?
+  status          ExpenseStatus @default(PENDING)
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("expenses")
+}
+
+enum ExpenseCategory {
+  SALARIES
+  UTILITIES
+  OFFICE_SUPPLIES
+  TRAVEL
+  EQUIPMENT
+  MARKETING
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ===== AUDIT LOG =====
+model AuditLog {
+  id              String     @id @default(cuid())
+  userId          String?
+  action          String
+  entity          String
+  entityId        String
+  changes         Json?
+  
+  createdAt       DateTime   @default(now())
+
+  @@map("audit_logs")
+}
